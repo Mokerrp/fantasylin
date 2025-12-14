@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy Lin | Interactive Christmas Tree</title>
+    <style>
+        :root {
+            --gold: #FFD700;
+            --emerald: #002211;
+            --glass: rgba(0, 34, 17, 0.6);
+            --border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            color: white;
+            user-select: none;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* UI Overlay - Ultra Compacted */
+        #ui-container {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: auto;
+            min-width: 240px;
+            max-width: 300px;
+            pointer-events: none; 
+        }
+
+        .glass-panel {
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--gold);
+            border-radius: 10px;
+            padding: 8px 12px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            pointer-events: auto;
+            transition: opacity 0.3s;
+        }
+
+        h1 {
+            font-size: 0.7rem;
+            margin: 0 0 2px 0;
+            color: var(--gold);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-align: center;
+            font-weight: 300;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        h2 {
+            font-size: 0.9rem;
+            margin: 0 0 6px 0;
+            color: var(--gold);
+            text-align: center;
+            font-weight: 400;
+            letter-spacing: 1px;
+            text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        /* Custom Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            background: var(--gold);
+            cursor: pointer;
+            margin-top: -3px;
+            box-shadow: 0 0 8px var(--gold);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+
+        /* Buttons - Ultra Compact */
+        .btn-group {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: transparent;
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            padding: 4px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.65rem;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: rgba(0,0,0,0.3);
+        }
+
+        .btn:hover {
+            background: var(--gold);
+            color: #000;
+            box-shadow: 0 0 10px var(--gold);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: #555;
+            color: #aaa;
+        }
+
+        /* Status & Feedback */
+        #status-text {
+            text-align: center;
+            font-size: 0.6rem;
+            color: #aaa;
+            margin-top: 2px;
+            font-style: italic;
+        }
+
+        #camera-feed {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 80px;
+            height: 60px;
+            border: 1px solid var(--gold);
+            border-radius: 6px;
+            opacity: 0.6;
+            z-index: 10;
+            transform: scaleX(-1); /* Mirror */
+            object-fit: cover;
+            display: none; /* Hidden until loaded */
+        }
+
+        /* Camera Trigger Button */
+        #camera-trigger {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 80px;
+            height: 60px;
+            border: 1px dashed var(--gold);
+            border-radius: 6px;
+            z-index: 11;
+            display: none; /* Hidden by default */
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            background: rgba(0,0,0,0.3);
+            transition: all 0.3s;
+        }
+        #camera-trigger:hover {
+            background: rgba(255, 215, 0, 0.2);
+            box-shadow: 0 0 10px var(--gold);
+        }
+        #camera-trigger svg {
+            width: 28px;
+            height: 28px;
+            fill: var(--gold);
+            filter: drop-shadow(0 0 2px black);
+        }
+
+        #gesture-indicator {
+            position: absolute;
+            top: 80px;
+            right: 15px;
+            color: var(--gold);
+            font-size: 0.65rem;
+            text-align: center;
+            width: 80px;
+            z-index: 10;
+            text-shadow: 0 0 5px black;
+        }
+
+        /* Loading Screen */
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255,215,0,0.3);
+            border-radius: 50%;
+            border-top-color: var(--gold);
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* File Input Hidden */
+        #file-input { display: none; }
+
+    </style>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+
+    <!-- Loading Screen -->
+    <div id="loader">
+        <div class="spinner"></div>
+        <div id="loading-text" style="color: #FFD700; letter-spacing: 2px;">INITIALIZING EXPERIENCE...</div>
+    </div>
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container"></div>
+
+    <!-- Camera Feed (Mirrored) -->
+    <video id="camera-feed" autoplay playsinline muted></video>
+    
+    <!-- Camera Trigger Icon -->
+    <div id="camera-trigger" title="Enable Camera">
+        <svg viewBox="0 0 24 24">
+            <path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 11.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+        </svg>
+    </div>
+
+    <div id="gesture-indicator">Initializing...</div>
+
+    <!-- UI Panel -->
+    <div id="ui-container">
+        <div class="glass-panel">
+            <h1>Fantasy Lin | Christmas Tree</h1>
+            <h2>🎄霖郎满木圣诞树✨</h2>
+            
+            <div class="controls">
+                <div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--gold); margin-bottom: 4px;">
+                        <span>FORMED</span>
+                        <span>CHAOS</span>
+                    </div>
+                    <input type="range" id="chaos-slider" min="0" max="1" step="0.01" value="0">
+                </div>
+                
+                <div class="btn-group">
+                    <button class="btn" id="upload-btn">Add Memories (+)</button>
+                    <input type="file" id="file-input" multiple accept="image/*">
+                </div>
+                
+                <div id="status-text">✋ Open=Chaos | ✊ Fist=Tree | 👌 Pinch=Zoom</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Logic -->
+    <script type="module">
+        import * as THREE from 'https://esm.sh/three@0.160.0';
+        import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+        import { RGBELoader } from 'https://esm.sh/three@0.160.0/examples/jsm/loaders/RGBELoader.js';
+        import { EffectComposer } from 'https://esm.sh/three@0.160.0/examples/jsm/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'https://esm.sh/three@0.160.0/examples/jsm/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'https://esm.sh/three@0.160.0/examples/jsm/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'https://esm.sh/three@0.160.0/examples/jsm/postprocessing/OutputPass.js';
+        import { FilesetResolver, HandLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/+esm';
+
+        // --- Configuration ---
+        const CONFIG = {
+            colors: {
+                emerald: new THREE.Color('#002211'),
+                emeraldLight: new THREE.Color('#004422'),
+                saturatedGreen: new THREE.Color('#006400'),
+                deepGreenSphere: new THREE.Color('#004b00'),
+                gold: new THREE.Color('#FFD700'),
+                red: new THREE.Color('#D70000'),
+                silver: new THREE.Color('#CCCCCC'),
+                white: new THREE.Color('#FFFFFF')
+            },
+            foliageCount: 30000,
+            ornamentCount: 350,
+            starCount: 3500,
+            treeHeight: 25,
+            treeRadius: 8,
+            chaosRadius: 55 // Increased for wider spacing in chaos
+        };
+
+        // --- State Management ---
+        const state = {
+            chaosFactor: 0, // 0 = Formed, 1 = Chaos
+            targetChaosFactor: 0,
+            rotationY: 0,
+            targetRotationSpeed: 0.002, // Auto rotation speed
+            currentRotationSpeed: 0.002,
+            gestureMode: false,
+            handDetected: false,
+            isPinching: false,
+            wasPinching: false, // For throw detection
+            pinchFactor: 0, // 0 = Normal, 1 = Zoomed
+            focusedPolaroidIndex: -1,
+            time: 0,
+            // Gesture Buffers for Stability
+            frameCounters: {
+                pinch: 0,
+                open: 0,
+                fist: 0
+            }
+        };
+
+        // --- Core Three.js Variables ---
+        let scene, camera, renderer, composer, controls;
+        let foliageSystem, ornamentSystem, starsSystem, topStar;
+        const polaroids = []; // Array of mesh objects
+        const clock = new THREE.Clock();
+        
+        // --- MediaPipe Variables ---
+        let handLandmarker;
+        let video;
+        let lastVideoTime = -1;
+        let treeGroup;
+
+        // --- Initialization ---
+        async function init() {
+            const container = document.getElementById('canvas-container');
+            if (!container) return; 
+
+            // 1. Renderer Setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // 2. Scene & Camera
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color('#000000');
+            scene.fog = new THREE.FogExp2(0x000000, 0.015);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 200);
+            camera.position.set(0, 10, 40);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 80;
+            controls.minDistance = 5;
+            controls.maxPolarAngle = Math.PI / 1.5; 
+
+            // 3. Lighting
+            setupLighting();
+
+            // 4. Post Processing (Bloom)
+            setupPostProcessing();
+
+            // 5. Objects
+            treeGroup = new THREE.Group();
+            scene.add(treeGroup);
+            
+            createStars();
+            createFoliage();
+            createOrnaments();
+            createTopStar();
+            
+            // 6. MediaPipe Setup & Camera Trigger
+            const trigger = document.getElementById('camera-trigger');
+            const ind = document.getElementById('gesture-indicator');
+
+            // Function to enable camera
+            const enableCamera = async () => {
+                try {
+                    if(ind) ind.innerText = "Initializing...";
+                    await setupMediaPipe();
+                    state.gestureMode = true;
+                    if(ind) ind.innerText = "Camera Active";
+                    if(trigger) trigger.style.display = 'none'; // Hide trigger on success
+                } catch(err) {
+                    console.error("Camera failed", err);
+                    if(ind) ind.innerText = "Camera Error";
+                    if(trigger) trigger.style.display = 'flex'; // Show trigger on error
+                }
+            };
+
+            // Attach click listener to the new camera icon
+            if(trigger) trigger.addEventListener('click', enableCamera);
+
+            // Attempt Auto-Start
+            try {
+                await setupMediaPipe();
+                state.gestureMode = true;
+                if(ind) ind.innerText = "Camera Active";
+                if(trigger) trigger.style.display = 'none';
+            } catch(e) {
+                console.warn("Auto-start camera failed, waiting for interaction", e);
+                if(ind) ind.innerText = "Enable Camera";
+                if(trigger) trigger.style.display = 'flex'; // Show trigger button
+            }
+
+            // 7. Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            setupUI();
+
+            // Finish Loading
+            const loader = document.getElementById('loader');
+            if(loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => loader.remove(), 500);
+            }
+
+            // Start Loop
+            animate();
+        }
+
+        function setupLighting() {
+            new RGBELoader()
+                .setPath('https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/')
+                .load('royal_esplanade_1k.hdr', function (texture) {
+                    texture.mapping = THREE.EquirectangularReflectionMapping;
+                    scene.environment = texture;
+                }, undefined, function (err) {
+                    console.error("HDRI Failed, using fallback lights", err);
+                    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+                    scene.add(ambient);
+                    const dirLight = new THREE.DirectionalLight(0xffd700, 2);
+                    dirLight.position.set(10, 20, 10);
+                    scene.add(dirLight);
+                });
+
+            const spotLight = new THREE.SpotLight(0xffd700, 500);
+            spotLight.position.set(20, 40, 20);
+            spotLight.angle = 0.5;
+            spotLight.penumbra = 0.5;
+            spotLight.castShadow = true;
+            scene.add(spotLight);
+
+            const fillLight = new THREE.PointLight(0x004422, 100);
+            fillLight.position.set(-20, 10, -20);
+            scene.add(fillLight);
+        }
+
+        function setupPostProcessing() {
+            const renderScene = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.6, 0.4, 0.85);
+            const outputPass = new OutputPass();
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(renderScene);
+            composer.addPass(bloomPass);
+            composer.addPass(outputPass);
+        }
+
+        function createStars() {
+            const geometry = new THREE.BufferGeometry();
+            const positions = [];
+            const sizes = [];
+
+            for (let i = 0; i < CONFIG.starCount; i++) {
+                const r = 60 + Math.random() * 60;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+
+                positions.push(
+                    r * Math.sin(phi) * Math.cos(theta),
+                    r * Math.sin(phi) * Math.sin(theta),
+                    r * Math.cos(phi)
+                );
+                sizes.push(Math.random() * 1.5);
+            }
+
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+
+            const material = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 0.1,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            starsSystem = new THREE.Points(geometry, material);
+            scene.add(starsSystem);
+        }
+
+        function createTopStar() {
+            const starShape = new THREE.Shape();
+            const points = 5;
+            const outerRadius = 1.4; 
+            const innerRadius = 0.7;
+            
+            for (let i = 0; i < points * 2; i++) {
+                const angle = (i * Math.PI) / points;
+                const r = (i % 2 === 0) ? outerRadius : innerRadius;
+                const x = Math.cos(angle) * r;
+                const y = Math.sin(angle) * r;
+                if (i === 0) starShape.moveTo(x, y);
+                else starShape.lineTo(x, y);
+            }
+            starShape.closePath();
+
+            const extrudeSettings = {
+                steps: 1,
+                depth: 0.6, 
+                bevelEnabled: true,
+                bevelThickness: 0.2, 
+                bevelSize: 0.15,
+                bevelSegments: 4
+            };
+
+            const geometry = new THREE.ExtrudeGeometry(starShape, extrudeSettings);
+            geometry.center();
+
+            const material = new THREE.MeshStandardMaterial({
+                color: CONFIG.colors.gold,
+                emissive: CONFIG.colors.gold,
+                emissiveIntensity: 0.6, 
+                metalness: 1.0, 
+                roughness: 0.15 
+            });
+            
+            topStar = new THREE.Mesh(geometry, material);
+            topStar.position.y = CONFIG.treeHeight / 2 + 1.8;
+            topStar.rotation.z = Math.PI; 
+            
+            const starLight = new THREE.PointLight(CONFIG.colors.gold, 20, 15);
+            starLight.position.z = 1;
+            topStar.add(starLight);
+
+            treeGroup.add(topStar);
+        }
+
+        function createFoliage() {
+            const geometry = new THREE.BufferGeometry();
+            const posFormed = [];
+            const posChaos = [];
+            const colors = [];
+            const randoms = [];
+
+            const tempColor = new THREE.Color();
+
+            for (let i = 0; i < CONFIG.foliageCount; i++) {
+                const ratio = i / CONFIG.foliageCount;
+                const y = (ratio * CONFIG.treeHeight) - (CONFIG.treeHeight / 2);
+                const radiusAtY = CONFIG.treeRadius * (1 - ratio);
+                const theta = Math.random() * Math.PI * 2;
+                const r = radiusAtY * Math.sqrt(Math.random()); 
+                
+                const xF = r * Math.cos(theta) + (Math.random() - 0.5) * 0.5;
+                const zF = r * Math.sin(theta) + (Math.random() - 0.5) * 0.5;
+                const yF = y + (Math.random() - 0.5) * 0.5;
+
+                posFormed.push(xF, yF, zF);
+
+                const phi = Math.acos(2 * Math.random() - 1);
+                const thetaC = Math.random() * Math.PI * 2;
+                const radC = CONFIG.chaosRadius * Math.cbrt(Math.random());
+                
+                posChaos.push(
+                    radC * Math.sin(phi) * Math.cos(thetaC),
+                    radC * Math.sin(phi) * Math.sin(thetaC),
+                    radC * Math.cos(phi)
+                );
+
+                const colorMix = Math.random();
+                if(colorMix > 0.7) tempColor.set(CONFIG.colors.emeraldLight);
+                else tempColor.set(CONFIG.colors.emerald);
+                colors.push(tempColor.r, tempColor.g, tempColor.b);
+
+                randoms.push(Math.random());
+            }
+
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(posFormed, 3));
+            geometry.setAttribute('posFormed', new THREE.Float32BufferAttribute(posFormed, 3));
+            geometry.setAttribute('posChaos', new THREE.Float32BufferAttribute(posChaos, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            geometry.setAttribute('aRandom', new THREE.Float32BufferAttribute(randoms, 1));
+
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    uTime: { value: 0 },
+                    uLerp: { value: 0 },
+                    uSize: { value: 2.5 * window.devicePixelRatio }
+                },
+                vertexShader: `
+                    uniform float uTime;
+                    uniform float uLerp;
+                    uniform float uSize;
+                    attribute vec3 posFormed;
+                    attribute vec3 posChaos;
+                    attribute vec3 color;
+                    attribute float aRandom;
+                    varying vec3 vColor;
+                    
+                    void main() {
+                        vColor = color;
+                        float t = clamp(uLerp * 1.4, 0.0, 1.0);
+                        t = t * t * (3.0 - 2.0 * t);
+                        vec3 pos = mix(posFormed, posChaos, t);
+                        pos.y += sin(uTime * 2.0 + aRandom * 10.0) * 0.1;
+                        vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                        gl_Position = projectionMatrix * mvPosition;
+                        gl_PointSize = uSize * (20.0 / -mvPosition.z);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float uTime;
+                    varying vec3 vColor;
+                    void main() {
+                        vec2 uv = gl_PointCoord - 0.5;
+                        if (length(uv) > 0.5) discard;
+                        float flash = sin(uTime * 5.0 + gl_FragCoord.x * 0.1) * 0.5 + 0.5;
+                        vec3 finalColor = vColor + vec3(flash * 0.2);
+                        gl_FragColor = vec4(finalColor, 1.0);
+                    }
+                `,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                transparent: true
+            });
+
+            foliageSystem = new THREE.Points(geometry, material);
+            treeGroup.add(foliageSystem);
+        }
+
+        function createOrnaments() {
+            const sphereGeo = new THREE.SphereGeometry(0.5, 32, 32);
+            const boxGeo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
+            
+            const material = new THREE.MeshStandardMaterial({
+                metalness: 0.95,
+                roughness: 0.15,
+                envMapIntensity: 1.5
+            });
+
+            const sphereMesh = new THREE.InstancedMesh(sphereGeo, material, CONFIG.ornamentCount / 2);
+            const boxMesh = new THREE.InstancedMesh(boxGeo, material, CONFIG.ornamentCount / 2);
+
+            sphereMesh.userData = { posFormed: [], posChaos: [], rots: [], type: 'sphere' };
+            boxMesh.userData = { posFormed: [], posChaos: [], rots: [], type: 'box' };
+
+            const dummy = new THREE.Object3D();
+            const color = new THREE.Color();
+
+            const fillData = (mesh, count) => {
+                const isBox = mesh.userData.type === 'box';
+                for(let i=0; i<count; i++) {
+                    const ratio = Math.random(); 
+                    const y = (ratio * CONFIG.treeHeight) - (CONFIG.treeHeight / 2);
+                    const r = CONFIG.treeRadius * (1 - ratio) + 0.5; 
+                    const theta = Math.random() * Math.PI * 2 * 8; 
+                    
+                    const xF = r * Math.cos(theta);
+                    const zF = r * Math.sin(theta);
+                    
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const thetaC = Math.random() * Math.PI * 2;
+                    const radC = CONFIG.chaosRadius * 0.8 * Math.cbrt(Math.random());
+                    
+                    const xC = radC * Math.sin(phi) * Math.cos(thetaC);
+                    const yC = radC * Math.sin(phi) * Math.sin(thetaC);
+                    const zC = radC * Math.cos(phi);
+
+                    mesh.userData.posFormed.push(new THREE.Vector3(xF, y, zF));
+                    mesh.userData.posChaos.push(new THREE.Vector3(xC, yC, zC));
+                    
+                    const rot = new THREE.Euler(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+                    mesh.userData.rots.push(rot);
+
+                    const randC = Math.random();
+                    if (isBox) {
+                        if(Math.random() < 0.4) color.set(CONFIG.colors.saturatedGreen);
+                        else color.set(CONFIG.colors.gold);
+                    } else {
+                        if(randC < 0.2) color.set(CONFIG.colors.gold); 
+                        else if(randC < 0.5) color.set(CONFIG.colors.red);
+                        else if(randC < 0.8) color.set(CONFIG.colors.deepGreenSphere); 
+                        else if(randC < 0.9) color.set(CONFIG.colors.silver);
+                        else color.set(CONFIG.colors.white); 
+                    }
+                    
+                    mesh.setColorAt(i, color);
+
+                    dummy.position.set(xF, y, zF);
+                    dummy.rotation.copy(rot);
+                    dummy.scale.setScalar(1);
+                    dummy.updateMatrix();
+                    mesh.setMatrixAt(i, dummy.matrix);
+                }
+            };
+
+            fillData(sphereMesh, CONFIG.ornamentCount/2);
+            fillData(boxMesh, CONFIG.ornamentCount/2);
+
+            sphereMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            boxMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+            ornamentSystem = [sphereMesh, boxMesh];
+            treeGroup.add(sphereMesh);
+            treeGroup.add(boxMesh);
+        }
+
+        function addPolaroid(imgUrl) {
+            const loader = new THREE.TextureLoader();
+            loader.load(imgUrl, (texture) => {
+                if (renderer) texture.anisotropy = renderer.capabilities.maxAnisotropy;
+                texture.minFilter = THREE.LinearFilter;
+                texture.magFilter = THREE.LinearFilter;
+                texture.colorSpace = THREE.SRGBColorSpace; 
+                texture.generateMipmaps = false; 
+
+                const aspect = texture.image.width / texture.image.height;
+                const w = 1.8; 
+                const h = w / aspect;
+                
+                const group = new THREE.Group();
+
+                // 4. Random Colorful Frame
+                const randomColor = new THREE.Color().setHSL(Math.random(), 0.8, 0.6);
+                
+                const borderGeo = new THREE.PlaneGeometry(w + 0.3, h + 0.8);
+                const borderMat = new THREE.MeshStandardMaterial({ 
+                    color: randomColor, 
+                    roughness: 0.4, 
+                    metalness: 0.1, 
+                    side: THREE.DoubleSide
+                });
+                const border = new THREE.Mesh(borderGeo, borderMat);
+                border.position.y = 0.2; 
+                group.add(border);
+
+                const photoGeo = new THREE.PlaneGeometry(w, h);
+                const photoMat = new THREE.MeshBasicMaterial({ map: texture });
+                const photo = new THREE.Mesh(photoGeo, photoMat);
+                photo.position.z = 0.02; 
+                photo.position.y = 0.3;
+                group.add(photo);
+
+                const index = polaroids.length;
+                const totalEstimated = 15; 
+                const ratio = (index % totalEstimated) / totalEstimated;
+                const y = (ratio * CONFIG.treeHeight) - (CONFIG.treeHeight / 2);
+                
+                const r = CONFIG.treeRadius * (1 - ratio) + 1.5; 
+                const theta = index * 2.0; 
+
+                const xF = r * Math.cos(theta);
+                const zF = r * Math.sin(theta);
+
+                // Chaos: Bias distribution towards the center/near field
+                const phiC = Math.acos(2 * Math.random() - 1);
+                const thetaC = Math.random() * Math.PI * 2;
+                // Use a distribution biased towards smaller values (center/near)
+                // Math.pow(Math.random(), 2) biases towards 0.
+                const radC = CONFIG.chaosRadius * (0.15 + Math.pow(Math.random(), 2) * 0.75);
+
+                group.userData = {
+                    posFormed: new THREE.Vector3(xF, y, zF),
+                    posChaos: new THREE.Vector3(
+                        radC * Math.sin(phiC) * Math.cos(thetaC), 
+                        radC * Math.sin(phiC) * Math.sin(thetaC), 
+                        radC * Math.cos(phiC)
+                    ),
+                    rotFormed: new THREE.Euler(0, -theta + Math.PI/2, 0),
+                    id: Math.random(),
+                    index: index,
+                    isThrown: false,
+                    velocity: new THREE.Vector3(),
+                    spin: new THREE.Vector3(),
+                    randomScale: 0.8 + Math.random() * 0.4 // Slight variation for breathing effect
+                };
+
+                group.position.copy(group.userData.posFormed);
+                group.rotation.copy(group.userData.rotFormed);
+                
+                if(treeGroup) treeGroup.add(group);
+                else scene.add(group);
+
+                polaroids.push(group);
+            });
+        }
+
+        function updatePhysics() {
+            // Smooth Rotation Speed Transition
+            // If Hand Detected: speed controlled by hand
+            // If No Hand: speed reverts to default auto-rotation
+            if (state.handDetected && state.chaosFactor > 0.5) {
+                // Hand control active - handled in processGestures
+            } else {
+                state.targetRotationSpeed = 0.002; // Default Auto CCW
+            }
+            state.currentRotationSpeed += (state.targetRotationSpeed - state.currentRotationSpeed) * 0.05;
+
+            // Apply Rotation
+            if (treeGroup) {
+                // In Formed state, auto rotate is handled differently, but let's unify for simplicity or keep separate
+                if (state.chaosFactor < 0.1 && !state.isPinching) {
+                     state.rotationY += 0.003; 
+                } else if (state.chaosFactor > 0.1 && !state.isPinching) {
+                     state.rotationY += state.currentRotationSpeed;
+                }
+                
+                treeGroup.rotation.y = THREE.MathUtils.lerp(treeGroup.rotation.y, state.rotationY, 0.1);
+                treeGroup.updateMatrixWorld(); 
+            }
+
+            // Chaos Transition
+            state.chaosFactor += (state.targetChaosFactor - state.chaosFactor) * 0.05;
+            
+            // Pinch/Zoom Transition
+            const targetPinch = state.isPinching ? 1 : 0;
+            state.pinchFactor += (targetPinch - state.pinchFactor) * 0.1;
+
+            // --- Foliage ---
+            if(foliageSystem) {
+                foliageSystem.material.uniforms.uLerp.value = state.chaosFactor;
+                foliageSystem.material.uniforms.uTime.value = state.time;
+            }
+
+            // --- Ornaments ---
+            const dummy = new THREE.Object3D();
+            ornamentSystem.forEach(mesh => {
+                const count = mesh.count;
+                const isBox = mesh.userData.type === 'box';
+                let t_start = isBox ? 0.3 : 0.1;
+                let t_end = isBox ? 1.0 : 0.9;
+                
+                let localT = THREE.MathUtils.mapLinear(state.chaosFactor, 0, 1, -t_start, 1 + (1-t_end));
+                localT = THREE.MathUtils.clamp(localT + t_start, 0, 1);
+                localT = localT * localT * (3 - 2 * localT);
+
+                for (let i = 0; i < count; i++) {
+                    const p1 = mesh.userData.posFormed[i];
+                    const p2 = mesh.userData.posChaos[i];
+                    dummy.position.lerpVectors(p1, p2, localT);
+                    
+                    if (state.chaosFactor > 0.1) {
+                         dummy.rotation.x = mesh.userData.rots[i].x + state.time * (i%2==0?0.5:-0.5);
+                         dummy.rotation.y = mesh.userData.rots[i].y + state.time * (i%3==0?0.5:-0.5);
+                    } else {
+                        dummy.rotation.copy(mesh.userData.rots[i]);
+                    }
+                    dummy.updateMatrix();
+                    mesh.setMatrixAt(i, dummy.matrix);
+                }
+                mesh.instanceMatrix.needsUpdate = true;
+            });
+
+            // --- Polaroids & Pinch Logic ---
+            if (state.isPinching && state.focusedPolaroidIndex === -1 && polaroids.length > 0) {
+                let minDist = Infinity;
+                let closestIdx = -1;
+                const tempVec = new THREE.Vector3();
+                
+                polaroids.forEach((p, i) => {
+                    if (p.userData.isThrown) return; // Ignore thrown ones
+                    
+                    // Use getWorldPosition to get accurate distance relative to camera
+                    p.getWorldPosition(tempVec);
+                    const d = tempVec.distanceTo(camera.position);
+
+                    if (d < minDist) {
+                        minDist = d;
+                        closestIdx = i;
+                    }
+                });
+                state.focusedPolaroidIndex = closestIdx;
+            } else if (!state.isPinching) {
+                state.focusedPolaroidIndex = -1;
+            }
+
+            polaroids.forEach((group, i) => {
+                // Special handling for thrown items
+                if (group.userData.isThrown) {
+                    group.position.add(group.userData.velocity);
+                    group.rotation.x += group.userData.spin.x;
+                    group.rotation.y += group.userData.spin.y;
+                    
+                    // Reset if far away
+                    if (group.position.distanceTo(camera.position) > 80) {
+                        group.userData.isThrown = false;
+                        // Fade in or just snap (snap is fine for now, obscured by chaos)
+                    }
+                    return; // Skip standard logic
+                }
+
+                // 1. Base Chaos/Tree Lerp
+                let localT = THREE.MathUtils.smoothstep(state.chaosFactor, 0.1, 0.8);
+                const treePos = group.userData.posFormed;
+                const chaosPos = group.userData.posChaos;
+                let currentPos = new THREE.Vector3().lerpVectors(treePos, chaosPos, localT);
+                
+                // 2. Pinch Effect Application
+                if (state.pinchFactor > 0.01) {
+                    if (i === state.focusedPolaroidIndex) {
+                        // Focus Target
+                        const dist = 8;
+                        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+                        const targetWorldPos = camera.position.clone().add(fwd.multiplyScalar(dist));
+                        const targetLocalPos = treeGroup.worldToLocal(targetWorldPos.clone());
+                        
+                        currentPos.lerp(targetLocalPos, state.pinchFactor);
+                        
+                        const targetScale = 1.2;
+                        group.scale.setScalar(THREE.MathUtils.lerp(1, targetScale, state.pinchFactor));
+                        
+                        if (state.pinchFactor > 0.1) {
+                            group.lookAt(camera.position);
+                        }
+                    } else {
+                        // Background
+                        const retreatPos = currentPos.clone().multiplyScalar(1.5); 
+                        currentPos.lerp(retreatPos, state.pinchFactor);
+                        const scale = THREE.MathUtils.lerp(1, 0.5, state.pinchFactor);
+                        group.scale.setScalar(scale);
+                        
+                        if (localT < 0.1) group.rotation.copy(group.userData.rotFormed);
+                    }
+                } else {
+                     // Normal State
+                    if (localT > 0.8) {
+                        group.lookAt(camera.position);
+                        
+                        // 3. Chaos Idle logic
+                        const breathing = Math.sin(state.time * 2 + i) * 0.05;
+                        
+                        // Distance scaling compensation: make distant ones bigger
+                        const dist = group.position.distanceTo(camera.position);
+                        const distScaleFactor = 1.0 + (dist / 30.0); // Boost size for far objects
+                        
+                        const chaosScale = (group.userData.randomScale + breathing) * 0.6 * distScaleFactor; 
+                        
+                        group.scale.setScalar(THREE.MathUtils.lerp(1, chaosScale, (localT - 0.8) * 5));
+                    } else {
+                        if(localT < 0.1) group.rotation.copy(group.userData.rotFormed);
+                        group.scale.setScalar(1); 
+                    }
+                }
+                
+                group.position.copy(currentPos);
+            });
+
+            // Animate Top Star
+            if(topStar) {
+                topStar.rotation.y += 0.01;
+            }
+        }
+
+        async function setupMediaPipe() {
+            const vision = await FilesetResolver.forVisionTasks(
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm"
+            );
+            
+            handLandmarker = await HandLandmarker.createFromOptions(vision, {
+                baseOptions: {
+                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+                    delegate: "GPU"
+                },
+                runningMode: "VIDEO",
+                numHands: 1
+            });
+
+            video = document.getElementById("camera-feed");
+            if (!video) return;
+
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            video.style.display = 'block';
+            
+            await new Promise((resolve) => {
+                video.onloadedmetadata = () => {
+                    video.play();
+                    resolve();
+                };
+            });
+        }
+
+        function processGestures() {
+            if (!handLandmarker || !video || video.paused) return;
+
+            let nowInMs = Date.now();
+            if (lastVideoTime !== video.currentTime) {
+                lastVideoTime = video.currentTime;
+                const results = handLandmarker.detectForVideo(video, nowInMs);
+                const ind = document.getElementById('gesture-indicator');
+                
+                if (results.landmarks.length > 0) {
+                    state.handDetected = true;
+                    const landmarks = results.landmarks[0];
+                    const isFingerExtended = (tipIdx, baseIdx) => {
+                        const dTip = Math.hypot(landmarks[tipIdx].x - landmarks[0].x, landmarks[tipIdx].y - landmarks[0].y);
+                        const dBase = Math.hypot(landmarks[baseIdx].x - landmarks[0].x, landmarks[baseIdx].y - landmarks[0].y);
+                        return dTip > dBase * 1.5;
+                    };
+
+                    const fingersOpen = [
+                        isFingerExtended(8, 5),  // Index
+                        isFingerExtended(12, 9), // Middle
+                        isFingerExtended(16, 13), // Ring
+                        isFingerExtended(20, 17) // Pinky
+                    ].filter(Boolean).length;
+
+                    // 1. PINCH DETECTION (Thumb 4 + Index 8)
+                    const thumbTip = landmarks[4];
+                    const indexTip = landmarks[8];
+                    const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+                    
+                    // Stability Buffer for Pinch
+                    // Restricted: Only allow pinch if chaosFactor > 0.8 (Chaos Mode)
+                    if (pinchDist < 0.05 && state.chaosFactor > 0.8) state.frameCounters.pinch++;
+                    else state.frameCounters.pinch = Math.max(0, state.frameCounters.pinch - 2);
+
+                    const isPinchingStable = state.frameCounters.pinch > 3; // Require 3 frames
+                    
+                    if (isPinchingStable) {
+                        state.isPinching = true;
+                         if(ind) {
+                            ind.innerText = "👌 PINCH: Zoom";
+                            ind.style.color = "#00ff00";
+                        }
+                    } else {
+                        state.isPinching = false;
+                        
+                        // 2. MAGIC THROW (Transition from Pinch -> Open)
+                        // This happens when fingers separate while focus was active
+                        if (state.wasPinching && !state.isPinching && state.focusedPolaroidIndex !== -1) {
+                            const idx = state.focusedPolaroidIndex;
+                            if (polaroids[idx]) {
+                                const p = polaroids[idx];
+                                p.userData.isThrown = true;
+                                // Throw away from camera (negative Z in camera space)
+                                p.userData.velocity = new THREE.Vector3(
+                                    (Math.random() - 0.5) * 1.5, 
+                                    (Math.random() - 0.5) * 0.5, 
+                                    -2.5 // Fast forward speed
+                                ).applyQuaternion(camera.quaternion); 
+                                
+                                p.userData.spin = new THREE.Vector3(
+                                    Math.random() * 0.4,
+                                    Math.random() * 0.4,
+                                    0
+                                );
+                            }
+                            state.focusedPolaroidIndex = -1; 
+                            if(ind) ind.innerText = "🃏 THROW!";
+                        } else {
+                            // CHAOS / FORMED Logic
+                            if(fingersOpen >= 3) {
+                                state.frameCounters.open++;
+                                state.frameCounters.fist = 0;
+                            } else if(fingersOpen <= 1) {
+                                state.frameCounters.fist++;
+                                state.frameCounters.open = 0;
+                            } else {
+                                state.frameCounters.open = Math.max(0, state.frameCounters.open - 1);
+                                state.frameCounters.fist = Math.max(0, state.frameCounters.fist - 1);
+                            }
+
+                            if (state.frameCounters.open > 5) { // 5 frames stable
+                                state.targetChaosFactor = 1;
+                                const slider = document.getElementById('chaos-slider');
+                                if(slider) slider.value = "1";
+                                if(ind) {
+                                    ind.innerText = "✋ OPEN: Chaos";
+                                    ind.style.color = "#ff3333";
+                                }
+                            } 
+                            else if (state.frameCounters.fist > 5) {
+                                state.targetChaosFactor = 0;
+                                const slider = document.getElementById('chaos-slider');
+                                if(slider) slider.value = "0";
+                                if(ind) {
+                                    ind.innerText = "✊ FIST: Formed";
+                                    ind.style.color = CONFIG.colors.gold.getStyle();
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. ROTATION Logic (Hand X position) - ONLY IN CHAOS MODE
+                    // Left Hand (x < 0.3) -> Rotate Left (positive Y)
+                    // Right Hand (x > 0.7) -> Rotate Right (negative Y)
+                    if (state.chaosFactor > 0.5) {
+                        const handX = landmarks[0].x; 
+                        
+                        if (handX < 0.3) {
+                             state.targetRotationSpeed = -0.02; // Rotate Right/Move Left
+                             if(ind) ind.innerText = "<< ROTATE LEFT";
+                        }
+                        else if (handX > 0.7) {
+                             state.targetRotationSpeed = 0.02; // Rotate Left/Move Right
+                             if(ind) ind.innerText = "ROTATE RIGHT >>";
+                        } else {
+                             state.targetRotationSpeed = 0; // Stop
+                        }
+                    }
+
+                    // Update previous state
+                    state.wasPinching = state.isPinching;
+
+                } else {
+                    state.handDetected = false;
+                    state.isPinching = false;
+                    state.wasPinching = false;
+                    state.frameCounters.pinch = 0;
+                    state.frameCounters.open = 0;
+                    state.frameCounters.fist = 0;
+
+                    if(ind) {
+                        ind.innerText = "No Hand";
+                        ind.style.color = "#aaa";
+                    }
+                }
+            }
+        }
+
+        function setupUI() {
+            const slider = document.getElementById('chaos-slider');
+            if(slider) {
+                slider.addEventListener('input', (e) => {
+                    state.targetChaosFactor = parseFloat(e.target.value);
+                });
+            }
+
+            const uploadBtn = document.getElementById('upload-btn');
+            const fileInput = document.getElementById('file-input');
+
+            if(uploadBtn && fileInput) {
+                uploadBtn.addEventListener('click', () => fileInput.click());
+                fileInput.addEventListener('change', (e) => {
+                    const files = e.target.files;
+                    if (!files.length) return;
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                            addPolaroid(evt.target.result);
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+            }
+        }
+
+        function onWindowResize() {
+            if(!camera || !renderer || !composer) return;
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            state.time = clock.getElapsedTime();
+            if (state.gestureMode) processGestures();
+            updatePhysics();
+            if(controls) controls.update();
+            if(composer) composer.render();
+        }
+
+        // Start
+        init();
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
